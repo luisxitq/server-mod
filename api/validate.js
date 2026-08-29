@@ -2,16 +2,9 @@ const ENCRYPTION_KEY = "JiM21rNU12eERlNmpqa3FuQks";
 const EXPECTED_TOKEN = "KJGMDKFJDHG34KD";
 const CURRENT_VERSION = "1.0";
 
-// Base de datos de licencias (puedes agregar o modificar llaves aquí)
 const VALID_KEYS = {
-  "TEST-KEY-123": {
-    expiry: "2026-12-31T23:59:59Z",
-    banned: false
-  },
-  "VIP-USER-2026": {
-    expiry: "2027-01-01T00:00:00Z",
-    banned: false
-  }
+  "TEST-KEY-123": { expiry: "2026-12-31T23:59:59Z", banned: false },
+  "VIP-USER-2026": { expiry: "2027-01-01T00:00:00Z", banned: false }
 };
 
 function xorEncryptDecrypt(data, key) {
@@ -47,6 +40,7 @@ function encryptPayload(dataObject, key) {
 }
 
 export default async function handler(req, res) {
+  // Solo permitir método POST
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -54,25 +48,22 @@ export default async function handler(req, res) {
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
 
-    // 1. Validar token estático
     if (!body || body.token !== EXPECTED_TOKEN) {
-      return res.status(401).json({ error: "Invalid app token" });
+      return res.status(401).json({ error: "Token de aplicación inválido" });
     }
 
     if (!body.data) {
-      return res.status(400).json({ error: "Missing payload data" });
+      return res.status(400).json({ error: "Faltan datos en la petición" });
     }
 
-    // 2. Descifrar petición del cliente C++
     const payload = decryptPayload(body.data, ENCRYPTION_KEY);
     if (!payload) {
-      return res.status(400).json({ error: "Decryption failed" });
+      return res.status(400).json({ error: "Fallo al descifrar los datos" });
     }
 
-    const { license_key, hwid, game_type, version } = payload;
+    const { license_key, version } = payload;
     let responsePayload = {};
 
-    // 3. Validar versión y credenciales
     if (version !== CURRENT_VERSION) {
       responsePayload = {
         status: "error",
@@ -82,15 +73,14 @@ export default async function handler(req, res) {
     } else if (!VALID_KEYS[license_key]) {
       responsePayload = {
         status: "error",
-        message: "Invalid license key"
+        message: "Licencia inválida"
       };
     } else {
       const keyData = VALID_KEYS[license_key];
-
       if (keyData.banned) {
         responsePayload = {
           status: "error",
-          message: "License banned"
+          message: "Licencia baneada"
         };
       } else {
         responsePayload = {
@@ -104,11 +94,10 @@ export default async function handler(req, res) {
       }
     }
 
-    // 4. Encapsular y cifrar respuesta
     const encryptedData = encryptPayload(responsePayload, ENCRYPTION_KEY);
     return res.status(200).json({ data: encryptedData });
 
   } catch (err) {
-    return res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: "Error interno del servidor" });
   }
 }

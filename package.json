@@ -1,6 +1,5 @@
 {
-  "name": "vercel-auth-server",
+  "name": "server-mod",
   "version": "1.0.0",
-  "main": "api/validate.js",
-  "dependencies": {}
+  "private": true
 }
