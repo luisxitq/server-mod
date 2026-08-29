@@ -1,21 +1,19 @@
-// Constantes configuradas en tu cliente C++
 const ENCRYPTION_KEY = "JiM21rNU12eERlNmpqa3FuQks";
-const EXPECTED_WS_TOKEN = "KJGMDKFJDHG34KD";
+const EXPECTED_TOKEN = "KJGMDKFJDHG34KD";
 const CURRENT_VERSION = "1.0";
 
-// Base de datos de licencias de prueba (puedes reemplazar esto con Supabase, MongoDB, etc.)
+// Base de datos de licencias (puedes agregar o modificar llaves aquí)
 const VALID_KEYS = {
-  "MI-LLAVE-VIP-123": {
+  "TEST-KEY-123": {
     expiry: "2026-12-31T23:59:59Z",
     banned: false
   },
-  "CLAVE-PRUEBA-2026": {
-    expiry: "2026-10-15T12:00:00Z",
+  "VIP-USER-2026": {
+    expiry: "2027-01-01T00:00:00Z",
     banned: false
   }
 };
 
-// Cifrado / Descifrado XOR + Base64
 function xorEncryptDecrypt(data, key) {
   let result = "";
   for (let i = 0; i < data.length; i++) {
@@ -49,34 +47,32 @@ function encryptPayload(dataObject, key) {
 }
 
 export default async function handler(req, res) {
-  // Solo se permiten peticiones POST
   if (req.method !== "POST") {
-    return res.status(450).json({ error: "Method not allowed" });
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
 
-    // 1. Validar Token estático enviado en la petición
-    if (!body.token || body.token !== EXPECTED_WS_TOKEN) {
+    // 1. Validar token estático
+    if (!body || body.token !== EXPECTED_TOKEN) {
       return res.status(401).json({ error: "Invalid app token" });
     }
 
-    // 2. Descifrar el cuerpo recibido
     if (!body.data) {
-      return res.status(400).json({ error: "Missing data payload" });
+      return res.status(400).json({ error: "Missing payload data" });
     }
 
+    // 2. Descifrar petición del cliente C++
     const payload = decryptPayload(body.data, ENCRYPTION_KEY);
     if (!payload) {
       return res.status(400).json({ error: "Decryption failed" });
     }
 
     const { license_key, hwid, game_type, version } = payload;
-
     let responsePayload = {};
 
-    // 3. Comprobar la versión del cliente C++
+    // 3. Validar versión y credenciales
     if (version !== CURRENT_VERSION) {
       responsePayload = {
         status: "error",
@@ -84,7 +80,6 @@ export default async function handler(req, res) {
         data: { version: CURRENT_VERSION }
       };
     } else if (!VALID_KEYS[license_key]) {
-      // 4. Validar si la llave existe
       responsePayload = {
         status: "error",
         message: "Invalid license key"
@@ -98,7 +93,6 @@ export default async function handler(req, res) {
           message: "License banned"
         };
       } else {
-        // 5. Autenticación exitosa
         responsePayload = {
           status: "success",
           data: {
@@ -110,7 +104,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // Encapsular la respuesta cifrada en el objeto "data"
+    // 4. Encapsular y cifrar respuesta
     const encryptedData = encryptPayload(responsePayload, ENCRYPTION_KEY);
     return res.status(200).json({ data: encryptedData });
 
