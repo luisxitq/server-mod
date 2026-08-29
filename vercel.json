@@ -1,9 +1,0 @@
-{
-  "version": 2,
-  "routes": [
-    {
-      "src": "/api/validate",
-      "dest": "/api/validate.js"
-    }
-  ]
-}
