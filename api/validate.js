@@ -39,26 +39,35 @@ function encryptPayload(dataObject, key) {
   return base64Encode(encrypted);
 }
 
-export default async function handler(req, res) {
-  // Solo permitir método POST
+module.exports = async (req, res) => {
+  // Asegurar cabecera de respuesta JSON
+  res.setHeader('Content-Type', 'application/json');
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    let body = req.body;
+    if (typeof body === "string") {
+      try {
+        body = JSON.parse(body);
+      } catch (e) {
+        return res.status(400).json({ error: "Invalid JSON format in body" });
+      }
+    }
 
     if (!body || body.token !== EXPECTED_TOKEN) {
-      return res.status(401).json({ error: "Token de aplicación inválido" });
+      return res.status(401).json({ error: "Invalid app token" });
     }
 
     if (!body.data) {
-      return res.status(400).json({ error: "Faltan datos en la petición" });
+      return res.status(400).json({ error: "Missing payload data" });
     }
 
     const payload = decryptPayload(body.data, ENCRYPTION_KEY);
     if (!payload) {
-      return res.status(400).json({ error: "Fallo al descifrar los datos" });
+      return res.status(400).json({ error: "Decryption failed" });
     }
 
     const { license_key, version } = payload;
@@ -73,14 +82,14 @@ export default async function handler(req, res) {
     } else if (!VALID_KEYS[license_key]) {
       responsePayload = {
         status: "error",
-        message: "Licencia inválida"
+        message: "Invalid license key"
       };
     } else {
       const keyData = VALID_KEYS[license_key];
       if (keyData.banned) {
         responsePayload = {
           status: "error",
-          message: "Licencia baneada"
+          message: "License banned"
         };
       } else {
         responsePayload = {
@@ -98,6 +107,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ data: encryptedData });
 
   } catch (err) {
-    return res.status(500).json({ error: "Error interno del servidor" });
+    return res.status(500).json({ error: "Internal server error", details: err.message });
   }
-}
+};
